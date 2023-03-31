@@ -54,6 +54,9 @@ private:
 //	Slider_With_Number* rot_y;
 	Slider_With_Number* scale_x;
 	Slider_With_Number* scale_y;
+	bool _is_scale_prop = true;
+	float _scale_prop = 1.;
+
 
 	Slider_With_Number* _opacity;
 

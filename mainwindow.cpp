@@ -7,6 +7,7 @@
 #include <QSlider>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QCheckBox>
 
 #include <QAction>
 #include <QMenu>
@@ -53,18 +54,35 @@ QLayout* MainWindow::make_slider_area(){
 	rot->addWidget(new QLabel("Rotation"), row++, 0);
 	rot->addLayout(new_lay("x", rot_x = new Slider_With_Number()), row++, 0);
 //	rot->addLayout(new_lay("y", rot_y = new Slider_With_Number()), row++, 0);
-	rot_x->set_min_max(0, 360);
+	rot_x->set_min_max(-360, 360);
 //	rot_y->set_min_max(0, 360);
 
 	auto scale = new QGridLayout();
 	row = 0;
 	scale->addWidget(new QLabel("Scale"), row++, 0);
+	QCheckBox* cb;
+	scale->addWidget(cb = new QCheckBox("Proportionately"), row++, 0);
 	scale->addLayout(new_lay("x", scale_x = new Slider_With_Number()), row++, 0);
 	scale->addLayout(new_lay("y", scale_y = new Slider_With_Number()), row++, 0);
-	scale_x->set_min_max(0, 200);
-	scale_y->set_min_max(0, 200);
+	scale_x->set_min_max(-200, 200);
+	scale_y->set_min_max(-200, 200);
 	scale_x->set_value(100);
 	scale_y->set_value(100);
+
+	cb->setChecked(true);
+	connect(cb, &QCheckBox::stateChanged, this, [&](int c){ _is_scale_prop = c; });
+	auto prop = [&](int inp){
+		if(!_is_scale_prop){
+			int vx = scale_x->get_value(), vy = scale_y->get_value();
+			_scale_prop = !vx && !vy ? 0 : (float)vx / vy;
+			return;
+		}
+
+		if(inp != scale_y->get_value()) scale_y->set_value(scale_x->get_value() / _scale_prop);
+		else scale_x->set_value(scale_y->get_value() * _scale_prop);
+	};
+	connect(scale_x->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
+	connect(scale_y->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
 
 	auto opacity = new QGridLayout();
 	row = 0;
@@ -93,7 +111,8 @@ void MainWindow::create_actions(){
 	QAction* load_mark = fileMenu->addAction(tr("&Load mark..."), this, [&](){
 		_viewer->clear_image();
 		_marker.set_mark(Image_Viewer::load_image());
-		_marker.place_watermark(_viewer->get_image());
+//		_marker.place_watermark(_viewer->get_image());
+		update_mark(1);
 		_viewer->update_image();
 	});
 	load_mark->setShortcut(tr("Ctrl+L"));
@@ -154,10 +173,15 @@ inline void MainWindow::updateActions(){
 void MainWindow::update_mark(int){
 	if(_viewer == nullptr || _viewer->get_image().isNull()) return;
 	auto s = _viewer->get_image().size();
+
 	QTransform tr;
 	tr.translate(s.width() * (float)pos_x->get_value() / 100, s.height() * (float)pos_y->get_value() / 100);
 	tr.scale((float)scale_x->get_value() / 100, (float)scale_y->get_value() / 100);
-	tr.rotate(rot_x->get_value());
+//	tr.rotate(rot_x->get_value());
+	QSize center = _marker.get_mark().size();
+	tr.translate(center.width() / 2, center.height() / 2)
+			.rotate(rot_x->get_value()).translate(-center.width() / 2, -center.height() / 2);
+
 	_viewer->clear_image();
 	_marker.place_watermark(_viewer->get_image(), tr, (float)_opacity->get_value() / 100);
 	_viewer->update_image();
