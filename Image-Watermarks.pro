@@ -9,12 +9,14 @@ CONFIG += c++11
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    directory_selection.cpp \
     image_viewer.cpp \
     main.cpp \
     mainwindow.cpp \
     marker.cpp
 
 HEADERS += \
+    directory_selection.h \
     image_viewer.h \
     mainwindow.h \
     marker.h

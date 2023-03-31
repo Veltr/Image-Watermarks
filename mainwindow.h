@@ -39,29 +39,32 @@ private:
 	Image_Viewer* _viewer = nullptr;
 	Marker _marker;
 
-	QAction* saveAsAct;
-	QAction* zoomInAct;
-	QAction* zoomOutAct;
-	QAction* normalSizeAct;
-	QAction* fitToWindowAct;
+	QAction* _save_as_act;
+	QAction* _zoom_in_act;
+	QAction* _zoom_out_act;
+	QAction* _normal_size_act;
+	QAction* fit_to_window_act;
 
 	void create_actions();
-	inline void updateActions();
+	inline void update_actions();
 
-	Slider_With_Number* pos_x;
-	Slider_With_Number* pos_y;
-	Slider_With_Number* rot_x;
-//	Slider_With_Number* rot_y;
-	Slider_With_Number* scale_x;
-	Slider_With_Number* scale_y;
+	Slider_With_Number* _pos_x;
+	Slider_With_Number* _pos_y;
+	Slider_With_Number* _rot_x;
+	Slider_With_Number* _scale_x;
+	Slider_With_Number* _scale_y;
 	bool _is_scale_prop = true;
 	float _scale_prop = 1.;
-
+	bool _one_scaled = false;
 
 	Slider_With_Number* _opacity;
 
 	QLayout* make_slider_area();
 	QLayout* new_lay(const QString& v, Slider_With_Number* slide);
+
+	QTransform collect_sliders(const QSize& size);
+
+	friend class Directory_Selection;
 };
 
 #endif // MAINWINDOW_H

@@ -5,7 +5,7 @@ Marker::Marker(){}
 Marker::Marker(const QImage& mark) : _mark(mark) {}
 
 Marker::Marker(const QImage& mark, const QTransform& transform) : _mark(mark){
-	_painter.setTransform(transform);
+	_tr = transform;
 }
 
 void Marker::place_watermark(QImage& target, const QImage& mark, const QTransform& transform, float opacity){

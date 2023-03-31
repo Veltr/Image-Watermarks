@@ -149,6 +149,7 @@ QImage Image_Viewer::load_image(QWidget* parent){
 		}
 		return newImage;
 	}
+	return QImage();
 }
 
 bool Image_Viewer::saveFile(const QString &fileName){

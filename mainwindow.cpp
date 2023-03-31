@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "directory_selection.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -21,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent){
 	s->addWidget(w);
 	_viewer = new Image_Viewer(this);
 //	connect(_viewer, &Image_Viewer::image_loaded, this, &MainWindow::update_sliders);
-	connect(_viewer, &Image_Viewer::image_seted, this, [&](){fitToWindowAct->setEnabled(true);});
+	connect(_viewer, &Image_Viewer::image_seted, this, [&](){fit_to_window_act->setEnabled(true);});
 	s->addWidget(_viewer);
 
 	setCentralWidget(s);
@@ -44,17 +45,17 @@ QLayout* MainWindow::make_slider_area(){
 	auto pos = new QGridLayout();
 	qint8 row = 0;
 	pos->addWidget(new QLabel("Position"), row++, 0);
-	pos->addLayout(new_lay("x", pos_x = new Slider_With_Number()), row++, 0);
-	pos->addLayout(new_lay("y", pos_y = new Slider_With_Number()), row++, 0);
-	pos_x->set_min_max(0, 100);
-	pos_y->set_min_max(0, 100);
+	pos->addLayout(new_lay("x", _pos_x = new Slider_With_Number()), row++, 0);
+	pos->addLayout(new_lay("y", _pos_y = new Slider_With_Number()), row++, 0);
+	_pos_x->set_min_max(0, 100);
+	_pos_y->set_min_max(0, 100);
 
 	auto rot = new QGridLayout();
 	row = 0;
 	rot->addWidget(new QLabel("Rotation"), row++, 0);
-	rot->addLayout(new_lay("x", rot_x = new Slider_With_Number()), row++, 0);
+	rot->addLayout(new_lay("x", _rot_x = new Slider_With_Number()), row++, 0);
 //	rot->addLayout(new_lay("y", rot_y = new Slider_With_Number()), row++, 0);
-	rot_x->set_min_max(-360, 360);
+	_rot_x->set_min_max(-360, 360);
 //	rot_y->set_min_max(0, 360);
 
 	auto scale = new QGridLayout();
@@ -62,27 +63,29 @@ QLayout* MainWindow::make_slider_area(){
 	scale->addWidget(new QLabel("Scale"), row++, 0);
 	QCheckBox* cb;
 	scale->addWidget(cb = new QCheckBox("Proportionately"), row++, 0);
-	scale->addLayout(new_lay("x", scale_x = new Slider_With_Number()), row++, 0);
-	scale->addLayout(new_lay("y", scale_y = new Slider_With_Number()), row++, 0);
-	scale_x->set_min_max(-200, 200);
-	scale_y->set_min_max(-200, 200);
-	scale_x->set_value(100);
-	scale_y->set_value(100);
+	scale->addLayout(new_lay("x", _scale_x = new Slider_With_Number()), row++, 0);
+	scale->addLayout(new_lay("y", _scale_y = new Slider_With_Number()), row++, 0);
+	_scale_x->set_min_max(-200, 200);
+	_scale_y->set_min_max(-200, 200);
+	_scale_x->set_value(100);
+	_scale_y->set_value(100);
 
 	cb->setChecked(true);
 	connect(cb, &QCheckBox::stateChanged, this, [&](int c){ _is_scale_prop = c; });
 	auto prop = [&](int inp){
 		if(!_is_scale_prop){
-			int vx = scale_x->get_value(), vy = scale_y->get_value();
+			int vx = _scale_x->get_value(), vy = _scale_y->get_value();
 			_scale_prop = !vx && !vy ? 0 : (float)vx / vy;
 			return;
 		}
 
-		if(inp != scale_y->get_value()) scale_y->set_value(scale_x->get_value() / _scale_prop);
-		else scale_x->set_value(scale_y->get_value() * _scale_prop);
+		if (_one_scaled) { _one_scaled = false; return; }
+		_one_scaled = true;
+		if(inp != _scale_y->get_value()) _scale_y->set_value(_scale_x->get_value() / _scale_prop);
+		else _scale_x->set_value(_scale_y->get_value() * _scale_prop);
 	};
-	connect(scale_x->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
-	connect(scale_y->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
+	connect(_scale_x->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
+	connect(_scale_y->spin, QOverload<int>::of(&QSpinBox::valueChanged), this, prop);
 
 	auto opacity = new QGridLayout();
 	row = 0;
@@ -104,21 +107,29 @@ void MainWindow::create_actions(){
 
 	QAction *openAct = fileMenu->addAction(tr("&Open..."), this, [&](){
 		_viewer->open();
-		updateActions();
+		update_actions();
 	});
 	openAct->setShortcut(QKeySequence::Open);
 
 	QAction* load_mark = fileMenu->addAction(tr("&Load mark..."), this, [&](){
+		const QImage& loaded = Image_Viewer::load_image();
+		if(loaded.isNull()) return;
 		_viewer->clear_image();
-		_marker.set_mark(Image_Viewer::load_image());
+		_marker.set_mark(loaded);
 //		_marker.place_watermark(_viewer->get_image());
 		update_mark(1);
 		_viewer->update_image();
 	});
 	load_mark->setShortcut(tr("Ctrl+L"));
 
-	saveAsAct = fileMenu->addAction(tr("&Save As..."), _viewer, &Image_Viewer::saveAs);
-	saveAsAct->setEnabled(false);
+	QAction* open_dir = fileMenu->addAction(tr("&Open directory..."), this, [&](){
+		auto dir_s = new Directory_Selection(this);
+		dir_s->show();
+	});
+	open_dir->setShortcut(tr("Ctrl+Shift+O"));
+
+	_save_as_act = fileMenu->addAction(tr("&Save As..."), _viewer, &Image_Viewer::saveAs);
+	_save_as_act->setEnabled(false);
 
 	fileMenu->addSeparator();
 
@@ -127,66 +138,70 @@ void MainWindow::create_actions(){
 
 	QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
 
-	zoomInAct = viewMenu->addAction(tr("Zoom &In (25%)"),this, [&](){
+	_zoom_in_act = viewMenu->addAction(tr("Zoom &In (25%)"),this, [&](){
 		_viewer->zoomIn();
-		updateActions();
+		update_actions();
 	});
-	zoomInAct->setShortcut(QKeySequence::ZoomIn);
-	zoomInAct->setEnabled(false);
+	_zoom_in_act->setShortcut(QKeySequence::ZoomIn);
+	_zoom_in_act->setEnabled(false);
 
-	zoomOutAct = viewMenu->addAction(tr("Zoom &Out (25%)"), this, [&](){
+	_zoom_out_act = viewMenu->addAction(tr("Zoom &Out (25%)"), this, [&](){
 		_viewer->zoomOut();
-		updateActions();
+		update_actions();
 	});
-	zoomOutAct->setShortcut(QKeySequence::ZoomOut);
-	zoomOutAct->setEnabled(false);
+	_zoom_out_act->setShortcut(QKeySequence::ZoomOut);
+	_zoom_out_act->setEnabled(false);
 
-	normalSizeAct = viewMenu->addAction(tr("&Normal Size"), this, [&](){
+	_normal_size_act = viewMenu->addAction(tr("&Normal Size"), this, [&](){
 		_viewer->normalSize();
-		updateActions();
+		update_actions();
 	});
-	normalSizeAct->setShortcut(tr("Ctrl+S"));
-	normalSizeAct->setEnabled(false);
+	_normal_size_act->setShortcut(tr("Ctrl+S"));
+	_normal_size_act->setEnabled(false);
 
 	viewMenu->addSeparator();
 
-	fitToWindowAct = viewMenu->addAction(tr("&Fit to Window"), this, [&](bool b){
+	fit_to_window_act = viewMenu->addAction(tr("&Fit to Window"), this, [&](bool b){
 		_viewer->fitToWindow(b);
-		updateActions();
+		update_actions();
 	});
-	fitToWindowAct->setEnabled(false);
-	fitToWindowAct->setCheckable(true);
-	fitToWindowAct->setShortcut(tr("Ctrl+F"));
+	fit_to_window_act->setEnabled(false);
+	fit_to_window_act->setCheckable(true);
+	fit_to_window_act->setShortcut(tr("Ctrl+F"));
 }
 
-inline void MainWindow::updateActions(){
-	saveAsAct->setEnabled(_viewer->has_image());
-	zoomInAct->setEnabled(!fitToWindowAct->isChecked());
-	zoomOutAct->setEnabled(!fitToWindowAct->isChecked());
-	normalSizeAct->setEnabled(!fitToWindowAct->isChecked());
+inline void MainWindow::update_actions(){
+	_save_as_act->setEnabled(_viewer->has_image());
+	_zoom_in_act->setEnabled(!fit_to_window_act->isChecked());
+	_zoom_out_act->setEnabled(!fit_to_window_act->isChecked());
+	_normal_size_act->setEnabled(!fit_to_window_act->isChecked());
 }
 
 //void MainWindow::update_sliders(const QImage& image){
 
 //}
 
+QTransform MainWindow::collect_sliders(const QSize& s){
+	QTransform tr;
+	tr.translate(s.width() * (float)_pos_x->get_value() / 100, s.height() * (float)_pos_y->get_value() / 100);
+	tr.scale((float)_scale_x->get_value() / 100, (float)_scale_y->get_value() / 100);
+//	tr.rotate(rot_x->get_value());
+	QSize center = _marker.get_mark().size();
+	tr.translate(center.width() / 2, center.height() / 2)
+			.rotate(_rot_x->get_value()).translate(-center.width() / 2, -center.height() / 2);
+
+	return tr;
+}
+
+
 void MainWindow::update_mark(int){
 	if(_viewer == nullptr || _viewer->get_image().isNull()) return;
 	auto s = _viewer->get_image().size();
 
-	QTransform tr;
-	tr.translate(s.width() * (float)pos_x->get_value() / 100, s.height() * (float)pos_y->get_value() / 100);
-	tr.scale((float)scale_x->get_value() / 100, (float)scale_y->get_value() / 100);
-//	tr.rotate(rot_x->get_value());
-	QSize center = _marker.get_mark().size();
-	tr.translate(center.width() / 2, center.height() / 2)
-			.rotate(rot_x->get_value()).translate(-center.width() / 2, -center.height() / 2);
-
 	_viewer->clear_image();
-	_marker.place_watermark(_viewer->get_image(), tr, (float)_opacity->get_value() / 100);
+	_marker.place_watermark(_viewer->get_image(), collect_sliders(s), (float)_opacity->get_value() / 100);
 	_viewer->update_image();
 }
-
 
 Slider_With_Number::Slider_With_Number(QWidget* parent) :
 	Slider_With_Number(new QSlider(Qt::Orientation::Horizontal), new QSpinBox(), parent) {}
