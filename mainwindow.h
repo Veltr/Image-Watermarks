@@ -32,8 +32,9 @@ public:
 	MainWindow(QWidget *parent = nullptr);
 
 private slots:
-//	void update_sliders(const QImage&);
 	void update_mark(int);
+	bool load_preset(const QString&);
+	bool save_preset(const QString&);
 
 private:
 	Image_Viewer* _viewer = nullptr;
@@ -44,6 +45,9 @@ private:
 	QAction* _zoom_out_act;
 	QAction* _normal_size_act;
 	QAction* fit_to_window_act;
+
+	QAction* _preset_save_act;
+	QAction* _preset_load_act;
 
 	void create_actions();
 	inline void update_actions();

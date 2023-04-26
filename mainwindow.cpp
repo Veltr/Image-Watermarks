@@ -14,6 +14,7 @@
 #include <QMenu>
 #include <QMenuBar>
 
+
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent){
 	auto s = new QSplitter(Qt::Orientation::Horizontal);
 	auto w = new QWidget;
@@ -119,6 +120,7 @@ void MainWindow::create_actions(){
 //		_marker.place_watermark(_viewer->get_image());
 		update_mark(1);
 		_viewer->update_image();
+		update_actions();
 	});
 	load_mark->setShortcut(tr("Ctrl+L"));
 
@@ -128,7 +130,7 @@ void MainWindow::create_actions(){
 	});
 	open_dir->setShortcut(tr("Ctrl+Shift+O"));
 
-	_save_as_act = fileMenu->addAction(tr("&Save As..."), _viewer, &Image_Viewer::saveAs);
+	_save_as_act = fileMenu->addAction(tr("&Save picture As..."), _viewer, &Image_Viewer::saveAs);
 	_save_as_act->setEnabled(false);
 
 	fileMenu->addSeparator();
@@ -168,6 +170,26 @@ void MainWindow::create_actions(){
 	fit_to_window_act->setEnabled(false);
 	fit_to_window_act->setCheckable(true);
 	fit_to_window_act->setShortcut(tr("Ctrl+F"));
+
+	QMenu* preset_menu = menuBar()->addMenu(tr("&Preset"));
+
+	_preset_load_act = preset_menu->addAction(tr("&Open preset..."), this, [&](){
+		QFileDialog dialog(this, tr("Open preset"), QString(), "Preset file (*.ipres)");
+		dialog.setDefaultSuffix(".ipres");
+		dialog.setAcceptMode(QFileDialog::AcceptOpen);
+
+		while (dialog.exec() == QDialog::Accepted && !load_preset(dialog.selectedFiles().first())) {}
+		update_actions();
+	});
+
+	_preset_save_act = preset_menu->addAction(tr("&Save preset..."), this, [&](){
+		QFileDialog dialog(this, tr("Open preset"), QString(), "Preset file (*.ipres)");
+		dialog.setDefaultSuffix(".ipres");
+		dialog.setAcceptMode(QFileDialog::AcceptSave);
+		while (dialog.exec() == QDialog::Accepted && !save_preset(dialog.selectedFiles().first())) {}
+		update_actions();
+	});
+	_preset_save_act->setEnabled(false);
 }
 
 inline void MainWindow::update_actions(){
@@ -175,6 +197,7 @@ inline void MainWindow::update_actions(){
 	_zoom_in_act->setEnabled(!fit_to_window_act->isChecked());
 	_zoom_out_act->setEnabled(!fit_to_window_act->isChecked());
 	_normal_size_act->setEnabled(!fit_to_window_act->isChecked());
+	_preset_save_act->setEnabled(_marker.has_mark());
 }
 
 //void MainWindow::update_sliders(const QImage& image){
@@ -195,13 +218,46 @@ QTransform MainWindow::collect_sliders(const QSize& s){
 
 
 void MainWindow::update_mark(int){
-	if(_viewer == nullptr || _viewer->get_image().isNull()) return;
+	if(_viewer == nullptr || !_marker.has_mark() || _viewer->get_image().isNull()) return;
 	auto s = _viewer->get_image().size();
 
 	_viewer->clear_image();
 	_marker.place_watermark(_viewer->get_image(), collect_sliders(s), (float)_opacity->get_value() / 100);
 	_viewer->update_image();
 }
+
+bool MainWindow::load_preset(const QString& filename){
+	QFile file(filename);
+	if(file.open(QIODevice::ReadOnly)){
+		QDataStream in(&file);
+		int t;
+		in >> t; _pos_x->set_value(t);
+		in >> t; _pos_y->set_value(t);
+		in >> t; _rot_x->set_value(t);
+		in >> t; _scale_x->set_value(t);
+		in >> t; _scale_y->set_value(t);
+		in >> t; _opacity->set_value(t);
+
+		QImage im; in >> im;
+		_marker.set_mark(im);
+
+		update_mark(0);
+		return true;
+	}
+	return false;
+}
+
+bool MainWindow::save_preset(const QString& filename){
+	QFile file(filename);
+	if(file.open(QIODevice::WriteOnly)){
+		QDataStream out(&file);
+		out << _pos_x->get_value() << _pos_y->get_value() << _rot_x->get_value()
+			<< _scale_x->get_value() << _scale_y->get_value() << _opacity->get_value() << _marker.get_mark();
+		return true;
+	}
+	return false;
+}
+
 
 Slider_With_Number::Slider_With_Number(QWidget* parent) :
 	Slider_With_Number(new QSlider(Qt::Orientation::Horizontal), new QSpinBox(), parent) {}

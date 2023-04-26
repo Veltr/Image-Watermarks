@@ -18,6 +18,7 @@ public:
 
 	inline void set_mark(const QImage& mark){ _mark = mark; }
 	inline QImage& get_mark(){ return _mark; }
+	inline bool has_mark(){ return !_mark.isNull(); }
 
 private:
 	QPainter _painter;
